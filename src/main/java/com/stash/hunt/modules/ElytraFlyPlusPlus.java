@@ -20,6 +20,8 @@ import net.minecraft.item.FireworkRocketItem;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.network.packet.c2s.play.*;
+import net.minecraft.network.packet.s2c.play.HealthUpdateS2CPacket;
+import net.minecraft.network.packet.s2c.play.PlayerPositionLookS2CPacket;
 import net.minecraft.network.packet.s2c.play.PlayerSpawnPositionS2CPacket;
 
 import com.stash.hunt.Addon;
@@ -231,7 +233,7 @@ public class ElytraFlyPlusPlus extends Module {
     @EventHandler
     private void onReceivePacket(PacketEvent.Receive event)
     {
-        if (event.packet instanceof PlayerSpawnPositionS2CPacket packet)
+        if (event.packet instanceof PlayerPositionLookS2CPacket packet)
         {
             onActivate();
         }
@@ -264,11 +266,12 @@ public class ElytraFlyPlusPlus extends Module {
             if (!useCustomYaw.get())
             {
                 // If less than 100 blocks from the start pos, angle calculation may be wrong, so just use players yaw
-                if (mc.player.getBlockPos().getSquaredDistance(startPos.get()) < 10_000)
+                if (mc.player.getBlockPos().getSquaredDistance(startPos.get()) < 10_000 || !highwayObstaclePasser.get())
                 {
                     double playerAngleNormalized = angleOnAxis(mc.player.getYaw());
                     yaw.set(playerAngleNormalized);
-                } else
+                }
+                else
                 {
                     // Otherwise use the angle from the starting position to the players position
                     BlockPos directionVec = mc.player.getBlockPos().subtract(startPos.get());
