@@ -174,14 +174,6 @@ public class ElytraFlyPlusPlus extends Module {
         .build()
     );
 
-    private final Setting<BlockPos> baritoneOffset = sgObstaclePasser.add(new BlockPosSetting.Builder()
-        .name("Baritone Offset")
-        .description("The offset in blocks from where goals should be set.")
-        .defaultValue(new BlockPos(0,0,0))
-        .visible(() -> bounce.get() && highwayObstaclePasser.get())
-        .build()
-    );
-
     private final Setting<Boolean> toggleElytra = sgGeneral.add(new BoolSetting.Builder()
         .name("Toggle Elytra")
         .description("Equips an elytra on activate, and a chestplate on deactivate.")
@@ -413,7 +405,7 @@ public class ElytraFlyPlusPlus extends Module {
                     Vec3d pos = startPos.get().toCenterPos().add(parallelCurrPosComponent);
                     pos = positionInDirection(pos, yaw.get(), currDistance);
 
-                    goal = new BlockPos((int)(Math.floor(pos.x) + baritoneOffset.get().getX()), targetY.get() + baritoneOffset.get().getY(), (int)Math.floor(pos.z) + baritoneOffset.get().getZ());
+                    goal = new BlockPos((int)(Math.floor(pos.x)), targetY.get(), (int)Math.floor(pos.z));
                     currDistance++;
 
                     // Blocks in unloaded chunks are void air, for some reason checking if the chunk is loaded was always true, so I check this instead
