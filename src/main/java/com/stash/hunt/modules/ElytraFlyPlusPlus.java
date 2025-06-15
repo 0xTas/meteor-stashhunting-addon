@@ -243,7 +243,14 @@ public class ElytraFlyPlusPlus extends Module {
     public void onActivate()
     {
         if (mc.player == null || mc.player.getAbilities().allowFlying) return;
-        if (mc.player.getPos().multiply(1, 0, 1).length() < 100) return; // I don't know any other way to fix this stupid shit
+
+        if (toggleElytra.get())
+        {
+            if (!(mc.player.getEquippedStack(EquipmentSlot.CHEST).getItem().equals(Items.ELYTRA))) {
+                Modules.get().get(ChestSwap.class).swap();
+            }
+        }
+
         startSprinting = mc.player.isSprinting();
         tempPath = null;
         portalTrap = null;
@@ -251,7 +258,8 @@ public class ElytraFlyPlusPlus extends Module {
         swapBackSlot = -1;
         waitingForChunksToLoad = false;
 
-        if (bounce.get())
+        // I don't know any other way to fix this stupid shit
+        if (bounce.get() && mc.player.getPos().multiply(1, 0, 1).length() >= 100)
         {
             if (BaritoneAPI.getProvider().getPrimaryBaritone().getElytraProcess().currentDestination() == null)
             {
@@ -284,13 +292,6 @@ public class ElytraFlyPlusPlus extends Module {
 
                     yaw.set(angleNormalized);
                 }
-            }
-        }
-
-        if (toggleElytra.get())
-        {
-            if (!mc.player.getEquippedStack(EquipmentSlot.CHEST).getItem().toString().contains("elytra")) {
-                Modules.get().get(ChestSwap.class).swap();
             }
         }
     }
