@@ -230,6 +230,8 @@ public class ElytraFlyPlusPlus extends Module {
     private boolean paused = false;
     private int swapBackSlot = -1; // slot used to hold the elytra slot when swapping to firework
 
+    private boolean elytraToggled = false;
+
     @EventHandler
     private void onReceivePacket(PacketEvent.Receive event)
     {
@@ -244,19 +246,13 @@ public class ElytraFlyPlusPlus extends Module {
     {
         if (mc.player == null || mc.player.getAbilities().allowFlying) return;
 
-        if (toggleElytra.get())
-        {
-            if (!(mc.player.getEquippedStack(EquipmentSlot.CHEST).getItem().equals(Items.ELYTRA))) {
-                Modules.get().get(ChestSwap.class).swap();
-            }
-        }
-
         startSprinting = mc.player.isSprinting();
         tempPath = null;
         portalTrap = null;
         paused = false;
         swapBackSlot = -1;
         waitingForChunksToLoad = false;
+        elytraToggled = false;
 
         // I don't know any other way to fix this stupid shit
         if (bounce.get() && mc.player.getPos().multiply(1, 0, 1).length() >= 100)
@@ -335,6 +331,18 @@ public class ElytraFlyPlusPlus extends Module {
     private void onTick(TickEvent.Pre event)
     {
         if (mc.player == null || mc.player.getAbilities().allowFlying) return;
+
+        if (toggleElytra.get() && !elytraToggled)
+        {
+            if (!(mc.player.getEquippedStack(EquipmentSlot.CHEST).getItem().equals(Items.ELYTRA)))
+            {
+                Modules.get().get(ChestSwap.class).swap();
+            }
+            else
+            {
+                elytraToggled = true;
+            }
+        }
 
         swapTicks--;
         if (swapTicks <= 0)
