@@ -38,17 +38,16 @@ public class Addon extends MeteorAddon {
 //        Modules.get().add(new UnknownAccountNotifier());
 
         Modules.get().add(new NoJumpDelay());
-        Modules.get().add(new GrimFastFall());
         Modules.get().add(new GrimAirPlace());
         Modules.get().add(new DiscordNotifs());
 //        Modules.get().add(new EndermanItemDetector());
 //        Modules.get().add(new GrimDuraFirework());
 //        Modules.get().add(new PacketTester());
-
 //        Modules.get().add(new StashMover2());
 //        Modules.get().add(new StashMoverListener());
 //        Modules.get().add(new PacketGrimFly());
         Modules.get().add(new AutoEXPPlus());
+//        Modules.get().add(new LavaESP());
 
         boolean baritoneLoaded = checkModLoaded("baritone", "baritone-meteor");
         boolean xaeroWorldMapLoaded = checkModLoaded("xaeroworldmap");
