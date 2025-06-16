@@ -20,6 +20,8 @@ import net.minecraft.item.FireworkRocketItem;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.network.packet.c2s.play.*;
+import net.minecraft.network.packet.s2c.play.HealthUpdateS2CPacket;
+import net.minecraft.network.packet.s2c.play.PlayerPositionLookS2CPacket;
 import net.minecraft.network.packet.s2c.play.PlayerSpawnPositionS2CPacket;
 
 import com.stash.hunt.Addon;
@@ -174,14 +176,6 @@ public class ElytraFlyPlusPlus extends Module {
         .build()
     );
 
-    private final Setting<BlockPos> baritoneOffset = sgObstaclePasser.add(new BlockPosSetting.Builder()
-        .name("Baritone Offset")
-        .description("The offset in blocks from where goals should be set.")
-        .defaultValue(new BlockPos(0,0,0))
-        .visible(() -> bounce.get() && highwayObstaclePasser.get())
-        .build()
-    );
-
     private final Setting<Boolean> toggleElytra = sgGeneral.add(new BoolSetting.Builder()
         .name("Toggle Elytra")
         .description("Equips an elytra on activate, and a chestplate on deactivate.")
@@ -236,10 +230,12 @@ public class ElytraFlyPlusPlus extends Module {
     private boolean paused = false;
     private int swapBackSlot = -1; // slot used to hold the elytra slot when swapping to firework
 
+    private boolean elytraToggled = false;
+
     @EventHandler
     private void onReceivePacket(PacketEvent.Receive event)
     {
-        if (event.packet instanceof PlayerSpawnPositionS2CPacket packet)
+        if (event.packet instanceof PlayerPositionLookS2CPacket packet)
         {
             onActivate();
         }
@@ -249,15 +245,17 @@ public class ElytraFlyPlusPlus extends Module {
     public void onActivate()
     {
         if (mc.player == null || mc.player.getAbilities().allowFlying) return;
-        if (mc.player.getPos().multiply(1, 0, 1).length() < 100) return; // I don't know any other way to fix this stupid shit
+
         startSprinting = mc.player.isSprinting();
         tempPath = null;
         portalTrap = null;
         paused = false;
         swapBackSlot = -1;
         waitingForChunksToLoad = false;
+        elytraToggled = false;
 
-        if (bounce.get())
+        // I don't know any other way to fix this stupid shit
+        if (bounce.get() && mc.player.getPos().multiply(1, 0, 1).length() >= 100)
         {
             if (BaritoneAPI.getProvider().getPrimaryBaritone().getElytraProcess().currentDestination() == null)
             {
@@ -272,11 +270,12 @@ public class ElytraFlyPlusPlus extends Module {
             if (!useCustomYaw.get())
             {
                 // If less than 100 blocks from the start pos, angle calculation may be wrong, so just use players yaw
-                if (mc.player.getBlockPos().getSquaredDistance(startPos.get()) < 10_000)
+                if (mc.player.getBlockPos().getSquaredDistance(startPos.get()) < 10_000 || !highwayObstaclePasser.get())
                 {
                     double playerAngleNormalized = angleOnAxis(mc.player.getYaw());
                     yaw.set(playerAngleNormalized);
-                } else
+                }
+                else
                 {
                     // Otherwise use the angle from the starting position to the players position
                     BlockPos directionVec = mc.player.getBlockPos().subtract(startPos.get());
@@ -289,13 +288,6 @@ public class ElytraFlyPlusPlus extends Module {
 
                     yaw.set(angleNormalized);
                 }
-            }
-        }
-
-        if (toggleElytra.get())
-        {
-            if (!mc.player.getEquippedStack(EquipmentSlot.CHEST).getItem().toString().contains("elytra")) {
-                Modules.get().get(ChestSwap.class).swap();
             }
         }
     }
@@ -339,6 +331,18 @@ public class ElytraFlyPlusPlus extends Module {
     private void onTick(TickEvent.Pre event)
     {
         if (mc.player == null || mc.player.getAbilities().allowFlying) return;
+
+        if (toggleElytra.get() && !elytraToggled)
+        {
+            if (!(mc.player.getEquippedStack(EquipmentSlot.CHEST).getItem().equals(Items.ELYTRA)))
+            {
+                Modules.get().get(ChestSwap.class).swap();
+            }
+            else
+            {
+                elytraToggled = true;
+            }
+        }
 
         swapTicks--;
         if (swapTicks <= 0)
@@ -413,7 +417,7 @@ public class ElytraFlyPlusPlus extends Module {
                     Vec3d pos = startPos.get().toCenterPos().add(parallelCurrPosComponent);
                     pos = positionInDirection(pos, yaw.get(), currDistance);
 
-                    goal = new BlockPos((int)(Math.floor(pos.x) + baritoneOffset.get().getX()), targetY.get() + baritoneOffset.get().getY(), (int)Math.floor(pos.z) + baritoneOffset.get().getZ());
+                    goal = new BlockPos((int)(Math.floor(pos.x)), targetY.get(), (int)Math.floor(pos.z));
                     currDistance++;
 
                     // Blocks in unloaded chunks are void air, for some reason checking if the chunk is loaded was always true, so I check this instead

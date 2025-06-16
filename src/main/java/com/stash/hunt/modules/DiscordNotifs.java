@@ -1,5 +1,6 @@
 package com.stash.hunt.modules;
 
+import com.mojang.authlib.GameProfile;
 import com.stash.hunt.Addon;
 import meteordevelopment.meteorclient.events.game.GameLeftEvent;
 import meteordevelopment.meteorclient.events.game.ReceiveMessageEvent;
@@ -8,19 +9,15 @@ import meteordevelopment.meteorclient.events.world.TickEvent;
 import meteordevelopment.meteorclient.settings.*;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.orbit.EventHandler;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.network.packet.s2c.play.SubtitleS2CPacket;
-import net.minecraft.network.packet.c2s.play.ChatCommandSignedC2SPacket;
-import net.minecraft.network.packet.c2s.play.ChatMessageC2SPacket;
-import net.minecraft.network.packet.c2s.play.ClientStatusC2SPacket;
-import net.minecraft.network.packet.c2s.play.CommandExecutionC2SPacket;
-import net.minecraft.network.packet.s2c.play.GameMessageS2CPacket;
 import net.minecraft.text.Text;
 import net.minecraft.text.TextColor;
 
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.util.LinkedList;
-import java.util.Queue;
+import java.util.*;
 
 import static com.stash.hunt.Utils.sendWebhook;
 
@@ -57,17 +54,26 @@ public class DiscordNotifs extends Module
         .build()
     );
 
-    private final Setting<Boolean> connections = sgGeneral.add(new BoolSetting.Builder()
-        .name("Disconnect")
-        .description("If a message should be logged when leaving.")
-        .defaultValue(false)
-        .build()
-    );
-
     private final Setting<Boolean> logAll = sgGeneral.add(new BoolSetting.Builder()
         .name("All Messages")
         .description("Logs all messages.")
         .defaultValue(false)
+        .build()
+    );
+
+    private final Setting<Boolean> connections = sgGeneral.add(new BoolSetting.Builder()
+        .name("Disconnect")
+        .description("If a message should be logged when leaving.")
+        .defaultValue(false)
+        .visible(() -> !logAll.get())
+        .build()
+    );
+
+    private final Setting<Boolean> playerRange = sgGeneral.add(new BoolSetting.Builder()
+        .name("Player Range")
+        .description("If a message should be logged when players enter/exit your render distance.")
+        .defaultValue(false)
+        .visible(() -> !logAll.get())
         .build()
     );
 
@@ -114,20 +120,20 @@ public class DiscordNotifs extends Module
     public DiscordNotifs()
     {
         super(Addon.CATEGORY, "DiscordNotifs", "Sends notifications to a discord webhook.");
-//        MeteorClient.EVENT_BUS.subscribe(new StaticListener());
     }
 
     @Override
     public void onActivate()
     {
         messageQueue.clear();
+        playersInRange.clear();
         delayTimer = 0;
     }
 
     private long delayTimer = 0;
     private int lastQueuePos;
     private final Queue<String> messageQueue = new LinkedList<String>();
-//    private String connectedServer;
+    private final Set<GameProfile> playersInRange = new HashSet<>();
 
     @EventHandler
     private void onTick(TickEvent.Post event)
@@ -139,6 +145,36 @@ public class DiscordNotifs extends Module
         else if (queueMessages.get() && !messageQueue.isEmpty())
         {
             sendWebhookMessage(messageQueue.poll());
+        }
+
+        Set<UUID> uuidsCurrentlyInRange = new HashSet<>();
+
+        // Check for players entering range
+        if (playerRange.get() && mc.world != null)
+        {
+            for (Entity entity : mc.world.getEntities())
+            {
+                if (entity.getUuid().equals(mc.player.getUuid())) continue;
+                if (entity instanceof PlayerEntity playerEntity)
+                {
+                    uuidsCurrentlyInRange.add(playerEntity.getUuid());
+                    if (!playersInRange.contains(playerEntity.getGameProfile()))
+                    {
+                        playersInRange.add(playerEntity.getGameProfile());
+                        handleMessage(playerEntity.getGameProfile().getName() + " has entered visual range!", MessageType.PLAYER_RANGE);
+                    }
+                }
+            }
+        }
+
+        // Check for players leaving range
+        for (GameProfile profile : playersInRange)
+        {
+            if (!uuidsCurrentlyInRange.contains(profile.getId()))
+            {
+                playersInRange.remove(profile);
+                handleMessage(profile.getName() + " has left visual range!", MessageType.PLAYER_RANGE);
+            }
         }
     }
 
@@ -191,6 +227,10 @@ public class DiscordNotifs extends Module
         {
             sendWebhookMessage(message);
         }
+        else if (playerRange.get() && messageType.equals(MessageType.PLAYER_RANGE))
+        {
+            sendWebhookMessage(message);
+        }
         else if (queue.get() && messageType.equals(MessageType.QUEUE))
         {
             sendWebhookMessage(message);
@@ -217,18 +257,6 @@ public class DiscordNotifs extends Module
             sendWebhookMessage(message);
         }
   }
-
-//    private class StaticListener {
-//        // Does not trigger when joining 2b2t from queue server. Not sure why
-//        @EventHandler
-//        private void onGameJoined(ServerConnectEndEvent event) {
-//            if (connections.get())
-//            {
-//                connectedServer = event.address.getAddress().getHostAddress();
-//                sendWebhookMessage("Joined " + connectedServer);
-//            }
-//        }
-//    }
 
     @EventHandler
     private void onDisconnect(GameLeftEvent event)
@@ -263,6 +291,7 @@ public class DiscordNotifs extends Module
         NORMAL,
         DEATH,
         QUEUE,
-        DISCONNECT
+        DISCONNECT,
+        PLAYER_RANGE
     }
 }
