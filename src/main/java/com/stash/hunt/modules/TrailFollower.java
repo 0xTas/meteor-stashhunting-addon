@@ -172,12 +172,12 @@ public class TrailFollower extends Module
         .build()
     );
 
-//    public final Setting<ChunkTypes> chunkType = sgAdvanced.add(new EnumSetting.Builder<ChunkTypes>()
-//        .name("Chunk Types")
-//        .description("The types of chunks to follow.")
-//        .defaultValue(ChunkTypes.ALL)
-//        .build()
-//    );
+    public final Setting<Boolean> only112 = sgAdvanced.add(new BoolSetting.Builder()
+        .name("Follow Only 1.12")
+        .description("Will only follow 1.12 chunks and will ignore other ones.")
+        .defaultValue(false)
+        .build()
+    );
 
     public final Setting<Double> chunkFoundTimeout = sgAdvanced.add(new DoubleSetting.Builder()
         .name("Chunk Found Timeout")
@@ -550,8 +550,6 @@ public class TrailFollower extends Module
         // if found in the cache then ignore the chunk
         if (seenChunksCache.getIfPresent(chunkLong) != null) return;
 
-
-
         ChunkPos chunkDelta = new ChunkPos(chunkPos.x - mc.player.getChunkPos().x, chunkPos.z - mc.player.getChunkPos().z);
 
         if (oppositeDimension.get())
@@ -683,7 +681,7 @@ public class TrailFollower extends Module
                 currentDimension
             );
 
-        return isHighlighted && (!is119NewChunk || is112OldChunk);
+        return isHighlighted && ((!is119NewChunk && !only112.get()) || is112OldChunk);
     }
 
     // not using this method now but will keep it in case
@@ -736,13 +734,13 @@ public class TrailFollower extends Module
         RIGHT
     }
 
-    public enum ChunkTypes
-    {
-        ONLY_OLD, // only 1.12 chunks that are not 1.19 chunks
-        OLD_AND_LOADED_IN_119, // 1.12 chunks that are loaded in 1.19
-        ONLY_NEW, // only 1.19 chunks that are not 1.12 chunks
-        ALL // all chunks
-    }
+//    public enum ChunkTypes
+//    {
+//        ONLY_OLD, // only 1.12 chunks that are not 1.19 chunks
+//        OLD_AND_LOADED_IN_119, // 1.12 chunks that are loaded in 1.19
+//        ONLY_NEW, // only 1.19 chunks that are not 1.12 chunks
+//        ALL // all chunks
+//    }
 
     public enum TrailEndBehavior
     {
