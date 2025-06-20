@@ -36,8 +36,8 @@ import java.io.FileWriter;
 import java.io.Writer;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import com.google.gson.JsonObject; // For JsonObject
-import java.io.IOException;        // For handling IOExceptions
+import com.google.gson.JsonObject;
+import java.io.IOException;
 
 import com.google.gson.*;
 import net.minecraft.registry.Registries;
@@ -340,6 +340,7 @@ public class ChestIndex extends Module
             if (!awaiting &&
                 !searched.contains(blockPos.toImmutable()) &&
                 (blockState.getBlock() == Blocks.CHEST ||
+                    blockState.getBlock() == Blocks.TRAPPED_CHEST ||
                     blockState.getBlock() == Blocks.BARREL ||
                     blockState.getBlock() instanceof ShulkerBoxBlock))
             {
@@ -356,7 +357,7 @@ public class ChestIndex extends Module
                     // find way to see when the interaction fails
                     info("interacted");
                     currPos[0] = blockPos.toImmutable();
-                    if (blockState.getBlock() == Blocks.CHEST)
+                    if (blockState.getBlock() == Blocks.CHEST || blockState.getBlock() == Blocks.TRAPPED_CHEST)
                     {
                         ChestType chestType = blockState.get(ChestBlock.CHEST_TYPE);
                         if (chestType == ChestType.LEFT || chestType == ChestType.RIGHT)
