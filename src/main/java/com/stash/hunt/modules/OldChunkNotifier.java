@@ -27,7 +27,6 @@ import static com.stash.hunt.Utils.*;
 public class OldChunkNotifier extends Module {
 
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
-    private final SettingGroup sgDimension = settings.createGroup("Dimension");
 
     public enum DimensionMode {
         OVERWORLD,
@@ -123,7 +122,7 @@ public class OldChunkNotifier extends Module {
         .build()
     );
 
-    public final Setting<DimensionMode> dimensionMode = sgDimension.add(new EnumSetting.Builder<DimensionMode>()
+    public final Setting<DimensionMode> dimensionMode = sgGeneral.add(new EnumSetting.Builder<DimensionMode>()
         .name("Dimension Mode")
         .description("Choose where the module will detect old chunks.")
         .defaultValue(DimensionMode.BOTH)
@@ -150,17 +149,6 @@ public class OldChunkNotifier extends Module {
     // Prevent the same chunk being sent multiple times.
     private final ArrayDeque<ChunkPos> oldChunks = new ArrayDeque<>();
 
-    private int getDimensionId(RegistryKey<World> world) {
-        if (world == World.NETHER) {
-            return -1;
-        } else if (world == World.OVERWORLD) {
-            return 0;
-        } else if (world == World.END) {
-            return 1;
-        }
-        return -2;
-    }
-
     @net.lenni0451.lambdaevents.EventHandler(priority = -1)
     public void onChunkData(ChunkDataEvent event)
     {
@@ -169,14 +157,9 @@ public class OldChunkNotifier extends Module {
         // avoid 2b2t end loading screen
         if (mc.player.getAbilities().allowFlying) return;
 
-        // Get player's dimension
-        int dimensionId = getDimensionId(mc.player.getWorld().getRegistryKey());
-
         // Check selected dimension mode
-        if ((dimensionMode.get() == DimensionMode.NETHER && dimensionId != -1) ||
-            (dimensionMode.get() == DimensionMode.OVERWORLD && dimensionId != 0)) {
-            return;
-        }
+        if ((dimensionMode.get() == DimensionMode.NETHER && mc.world != World.NETHER) ||
+            (dimensionMode.get() == DimensionMode.OVERWORLD && mc.world != World.OVERWORLD)) return;
 
         if (oldChunks.size() > 1000) {
             oldChunks.removeFirst();
