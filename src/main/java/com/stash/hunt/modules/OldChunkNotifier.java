@@ -158,8 +158,8 @@ public class OldChunkNotifier extends Module {
         if (mc.player.getAbilities().allowFlying) return;
 
         // Check selected dimension mode
-        if ((dimensionMode.get() == DimensionMode.NETHER && mc.world != World.NETHER) ||
-            (dimensionMode.get() == DimensionMode.OVERWORLD && mc.world != World.OVERWORLD)) return;
+        if ((dimensionMode.get() == DimensionMode.NETHER && mc.world.getRegistryKey() != World.NETHER) ||
+            (dimensionMode.get() == DimensionMode.OVERWORLD && mc.world.getRegistryKey() != World.OVERWORLD)) return;
 
         if (oldChunks.size() > 1000) {
             oldChunks.removeFirst();
