@@ -4,8 +4,6 @@ import com.stash.hunt.modules.ElytraFlyPlusPlus;
 import meteordevelopment.meteorclient.systems.modules.Modules;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityPose;
-import net.minecraft.entity.MovementType;
-import net.minecraft.util.math.Vec3d;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -16,7 +14,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import java.util.UUID;
 
 import static meteordevelopment.meteorclient.MeteorClient.mc;
-import static meteordevelopment.meteorclient.utils.player.ChatUtils.info;
 
 @Mixin(Entity.class)
 public class EntityMixin
@@ -41,20 +38,6 @@ public class EntityMixin
         if (efly != null && efly.enabled() && this.uuid == mc.player.getUuid())
         {
             cir.setReturnValue(true);
-        }
-    }
-
-    @Inject(at = @At("RETURN"), method = "adjustMovementForCollisions", cancellable = true)
-    private void adjustMovementForCollisions(Vec3d movement, CallbackInfoReturnable<Vec3d> cir)
-    {
-        if (mc.player != null && this.uuid == mc.player.getUuid() &&
-            efly != null && efly.enabled() && (Boolean)Modules.get().get(ElytraFlyPlusPlus.class).settings.get("fake-head-collision").get())
-        {
-            Vec3d returnValue = cir.getReturnValue();
-            if (Math.abs(returnValue.getY() - 0.42) < 0.1)
-            {
-                cir.setReturnValue(new Vec3d(returnValue.getX(), 0.2, returnValue.getZ()));
-            }
         }
     }
 
