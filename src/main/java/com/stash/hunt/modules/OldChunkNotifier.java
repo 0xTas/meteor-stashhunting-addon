@@ -5,6 +5,8 @@ import meteordevelopment.meteorclient.settings.*;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
+import net.minecraft.registry.RegistryKey;
 import xaero.hud.minimap.BuiltInHudModules;
 import xaero.hud.minimap.module.MinimapSession;
 import xaero.hud.minimap.waypoint.set.WaypointSet;
@@ -25,6 +27,29 @@ import static com.stash.hunt.Utils.*;
 public class OldChunkNotifier extends Module {
 
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
+
+    public enum DimensionMode {
+        OVERWORLD,
+        NETHER,
+        BOTH
+    }
+
+    public enum ChunkTypeMode {
+        ONLY_112("1.12 Only"),
+        ONLY_119("1.19+ Only"),
+        BOTH("Both");
+
+        private final String displayName;
+
+        ChunkTypeMode(String displayName) {
+            this.displayName = displayName;
+        }
+
+        @Override
+        public String toString() {
+            return displayName;
+        }
+    }
 
     private final Setting<Boolean> notifyAnyChunks = sgGeneral.add(new BoolSetting.Builder()
         .name("Notify Any Chunks")
@@ -59,6 +84,13 @@ public class OldChunkNotifier extends Module {
         .build()
     );
 
+    private final Setting<ChunkTypeMode> chunkTypeMode = sgGeneral.add(new EnumSetting.Builder<ChunkTypeMode>()
+        .name("Chunk Type")
+        .description("Which type of old chunks to detect.")
+        .defaultValue(ChunkTypeMode.BOTH)
+        .build()
+    );
+
     private final Setting<LogType> logType = sgGeneral.add(new EnumSetting.Builder<LogType>()
         .name("Log Type")
         .description("What to do when an old chunk is detected.")
@@ -90,6 +122,13 @@ public class OldChunkNotifier extends Module {
         .build()
     );
 
+    public final Setting<DimensionMode> dimensionMode = sgGeneral.add(new EnumSetting.Builder<DimensionMode>()
+        .name("Dimension Mode")
+        .description("Choose where the module will detect old chunks.")
+        .defaultValue(DimensionMode.BOTH)
+        .build()
+    );
+
     public OldChunkNotifier() {
         super(Addon.CATEGORY, "OldChunkNotifier", "Sends a webhook message and optionally pings you when an old chunk is detected.");
     }
@@ -118,6 +157,10 @@ public class OldChunkNotifier extends Module {
         // avoid 2b2t end loading screen
         if (mc.player.getAbilities().allowFlying) return;
 
+        // Check selected dimension mode
+        if ((dimensionMode.get() == DimensionMode.NETHER && mc.world != World.NETHER) ||
+            (dimensionMode.get() == DimensionMode.OVERWORLD && mc.world != World.OVERWORLD)) return;
+
         if (oldChunks.size() > 1000) {
             oldChunks.removeFirst();
         }
@@ -139,7 +182,23 @@ public class OldChunkNotifier extends Module {
                 event.chunk().getWorld().getRegistryKey()
             );
 
-        if (is119NewChunk && !is112OldChunk) return;
+        // Check chunk type filtering
+        ChunkTypeMode typeMode = chunkTypeMode.get();
+        boolean shouldNotify = false;
+        
+        switch (typeMode) {
+            case ONLY_112:
+                shouldNotify = is112OldChunk;
+                break;
+            case ONLY_119:
+                shouldNotify = !is119NewChunk && !is112OldChunk;
+                break;
+            case BOTH:
+                shouldNotify = !is119NewChunk || is112OldChunk;
+                break;
+        }
+
+        if (!shouldNotify) return;
 
         if (notifyAnyChunks.get())
         {
