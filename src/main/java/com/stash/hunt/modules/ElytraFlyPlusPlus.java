@@ -72,7 +72,7 @@ public class ElytraFlyPlusPlus extends Module {
         .name("Speed")
         .description("The speed in blocks per second to keep you at.")
         .defaultValue(100.0)
-        .visible(() -> bounce.get() && (lockPitch.get() && autoAdjustPitch.get() || motionYBoost.get()))
+        .visible(() -> bounce.get() && lockPitch.get() && autoAdjustPitch.get())
         .build()
     );
 
