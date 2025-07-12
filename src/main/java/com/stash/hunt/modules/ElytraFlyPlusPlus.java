@@ -392,7 +392,7 @@ public class ElytraFlyPlusPlus extends Module {
                 if (!enabled()) return;
 
                 double playerSpeed = Utils.getPlayerSpeed().multiply(1, 0, 1).length();
-                if (enabled() && motionYBoost.get() && mc.player.getVelocity().y > 0 && playerSpeed < this.speed.get())
+                if (enabled() && motionYBoost.get() && mc.player.getVelocity().y > 0 && playerSpeed < speed.get())
                 {
                     mc.player.setVelocity(mc.player.getVelocity().x, 0.0, mc.player.getVelocity().z);
                 }
