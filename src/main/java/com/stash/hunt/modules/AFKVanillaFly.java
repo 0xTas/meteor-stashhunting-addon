@@ -30,6 +30,22 @@ public class AFKVanillaFly extends Module {
         .build()
     );
 
+    private final Setting<Boolean> useManualY = sgGeneral.add(new BoolSetting.Builder()
+        .name("Use Manual Y Level")
+        .description("Use a manually set Y level instead of the Y level where module was activated.")
+        .defaultValue(false)
+        .build()
+    );
+
+    private final Setting<Integer> manualYLevel = sgGeneral.add(new IntSetting.Builder()
+        .name("Manual Y Level")
+        .description("The Y level to maintain when using manual Y level.")
+        .defaultValue(120)
+        .sliderRange(-64, 320)
+        .visible(useManualY::get)
+        .build()
+    );
+
     @Override
     public void onActivate() {
         launched = false;
@@ -45,7 +61,7 @@ public class AFKVanillaFly extends Module {
 
         double currentY = mc.player.getY();
 
-        if (mc.player.isFallFlying()) {
+        if (mc.player.isFallFlying() && !useManualY.get()) {
             if (yTarget == -1 || !launched) {
                 yTarget = currentY;
                 launched = true;
@@ -56,6 +72,31 @@ public class AFKVanillaFly extends Module {
             if (Math.abs(yDiffFromLock) > 10.0) {
                 yTarget = currentY; // reset the current y-level to maintain
                 info("Y-lock reset due to altitude deviation.");
+            }
+
+            double yDiff = currentY - yTarget;
+
+            if (Math.abs(yDiff) > 10.0) {
+                targetPitch = (float) (-Math.atan2(yDiff, 100) * (180 / Math.PI));
+            } else if (yDiff > 2.0) {
+                targetPitch = 10f;
+            } else if (yDiff < -2.0) {
+                targetPitch = -10f;
+            } else {
+                targetPitch = 0f;
+            }
+
+            float currentPitch = mc.player.getPitch();
+            float pitchDiff = targetPitch - currentPitch;
+            mc.player.setPitch(currentPitch + pitchDiff * 0.1f);
+
+            if (System.currentTimeMillis() - lastRocketUse > fireworkDelay.get()) {
+                tryUseFirework();
+            }
+        } else if (mc.player.isFallFlying() && useManualY.get()) {
+            if (yTarget == -1 || !launched) {
+                yTarget = manualYLevel.get();
+                launched = true;
             }
 
             double yDiff = currentY - yTarget;
