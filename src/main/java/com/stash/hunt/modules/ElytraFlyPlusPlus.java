@@ -52,6 +52,15 @@ public class ElytraFlyPlusPlus extends Module {
         .build()
     );
 
+    private final Setting<Double> speed = sgGeneral.add(new DoubleSetting.Builder()
+        .name("Speed")
+        .description("The speed in blocks per second to keep you at.")
+        .defaultValue(100.0)
+        .range(10, 105)
+        .visible(() -> bounce.get() && motionYBoost.get())
+        .build()
+    );
+
     private final Setting<Boolean> lockPitch = sgGeneral.add(new BoolSetting.Builder()
         .name("Lock Pitch")
         .description("Whether to lock your pitch when bounce is enabled.")
@@ -60,27 +69,11 @@ public class ElytraFlyPlusPlus extends Module {
         .build()
     );
 
-    private final Setting<Boolean> autoAdjustPitch = sgGeneral.add(new BoolSetting.Builder()
-        .name("Auto Adjust Pitch")
-        .description("Whether to auto adjust your pitch to stay at a set speed")
-        .defaultValue(false)
-        .visible(() -> bounce.get() && lockPitch.get())
-        .build()
-    );
-
-    private final Setting<Double> speed = sgGeneral.add(new DoubleSetting.Builder()
-        .name("Speed")
-        .description("The speed in blocks per second to keep you at.")
-        .defaultValue(100.0)
-        .visible(() -> bounce.get() && lockPitch.get() && autoAdjustPitch.get())
-        .build()
-    );
-
     private final Setting<Double> pitch = sgGeneral.add(new DoubleSetting.Builder()
         .name("Pitch")
         .description("The pitch to set when bounce is enabled.")
         .defaultValue(90.0)
-        .visible(() -> bounce.get() && lockPitch.get() && !autoAdjustPitch.get())
+        .visible(() -> bounce.get() && lockPitch.get())
         .build()
     );
 
@@ -334,12 +327,10 @@ public class ElytraFlyPlusPlus extends Module {
                 return;
             }
 
-            // Length check to fix weird issue where goal gets set to 0 0 when going through queue, even though it gets reset. Likely due to bad connection.
-            if (highwayObstaclePasser.get() && mc.player.getPos().length() > 100 && (mc.player.getY() < targetY.get()
-                || mc.player.getY() > targetY.get() + 2
-                || mc.player.horizontalCollision)
-                || portalTrap != null && portalTrap.getSquaredDistance(mc.player.getBlockPos()) < portalAvoidDistance.get() * portalAvoidDistance.get()
-                || waitingForChunksToLoad)
+            if (highwayObstaclePasser.get() && mc.player.getPos().length() > 100 && // > 100 check needed bc server sends queue coordinates when joining in first tick causing goal coordinates to be set to (0, 0)
+                (mc.player.getY() < targetY.get() || mc.player.getY() > targetY.get() + 2 || mc.player.horizontalCollision) // collisions / out of highway
+                || (portalTrap != null && portalTrap.getSquaredDistance(mc.player.getBlockPos()) < portalAvoidDistance.get() * portalAvoidDistance.get()) // portal trap detection
+                || waitingForChunksToLoad) // waiting for chunks to load
             {
                 waitingForChunksToLoad = false;
                 paused = true;
@@ -392,11 +383,11 @@ public class ElytraFlyPlusPlus extends Module {
                 if (!enabled()) return;
 
                 double playerSpeed = Utils.getPlayerSpeed().multiply(1, 0, 1).length();
-                if (enabled() && motionYBoost.get() && mc.player.getVelocity().y > 0 && playerSpeed < speed.get())
+                if (motionYBoost.get() && mc.player.getVelocity().y > 0 && playerSpeed < speed.get())
                 {
                     mc.player.setVelocity(mc.player.getVelocity().x, 0.0, mc.player.getVelocity().z);
                 }
-                
+
                 if (mc.player.isOnGround())
                 {
                     mc.player.jump();
@@ -409,14 +400,7 @@ public class ElytraFlyPlusPlus extends Module {
                 }
                 if (lockPitch.get())
                 {
-                    if (autoAdjustPitch.get())
-                    {
-                        mc.player.setPitch((float) Math.min(90, Math.max(-90, (speed.get() - playerSpeed) * 5)));
-                    }
-                    else
-                    {
-                        mc.player.setPitch(pitch.get().floatValue());
-                    }
+                    mc.player.setPitch(pitch.get().floatValue());
                 }
             }
         }
