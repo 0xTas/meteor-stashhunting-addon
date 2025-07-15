@@ -460,6 +460,7 @@ public class ElytraFlyPlusPlus extends Module {
         List<Identifier> armorEquipSounds = List.of(
             Identifier.of("minecraft:item.armor.equip_generic"),
             Identifier.of("minecraft:item.armor.equip_netherite"),
+            Identifier.of("minecraft:item.armor.equip_elytra"),
             Identifier.of("minecraft:item.armor.equip_diamond"),
             Identifier.of("minecraft:item.armor.equip_gold"),
             Identifier.of("minecraft:item.armor.equip_iron"),
