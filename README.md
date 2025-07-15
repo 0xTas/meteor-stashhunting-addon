@@ -4,8 +4,9 @@
 #### Check the [Wiki](https://github.com/miles352/meteor-stashhunting-addon/wiki) for a full list of features and options.
 ## Features
 - ElytraFlyPlusPlus
-  - Has a bounce mode with a baritone obstacle passer for highways.
+  - Has a bounce mode with a baritone obstacle passer for highways, including ring-roads.
   - Motion Y Boost mode can go up to 105 bps.
+  - Fake fly option allows you to fly with a chestplate on to minimize lost durability.
 - TrailFollower (Credit to [WarriorLost](https://github.com/warriorlost) for creating the original TrailFollower this was based off)
   - Follows trails in all dimensions using either pitch40 or baritone. May break on path splits or other cases.
 - BetterStashFinder
