@@ -2,9 +2,12 @@ package com.stash.hunt.modules;
 
 import baritone.api.BaritoneAPI;
 import baritone.api.pathing.goals.GoalBlock;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import meteordevelopment.meteorclient.events.entity.player.InteractItemEvent;
 import meteordevelopment.meteorclient.events.packets.PacketEvent;
 import meteordevelopment.meteorclient.events.world.ChunkDataEvent;
+import meteordevelopment.meteorclient.events.world.PlaySoundEvent;
 import meteordevelopment.meteorclient.events.world.TickEvent;
 import meteordevelopment.meteorclient.settings.*;
 import meteordevelopment.meteorclient.systems.modules.Module;
@@ -25,10 +28,14 @@ import net.minecraft.network.packet.s2c.play.PlayerPositionLookS2CPacket;
 import net.minecraft.network.packet.s2c.play.PlayerSpawnPositionS2CPacket;
 
 import com.stash.hunt.Addon;
+import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.util.Hand;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.Vec3d;
+
+import java.util.List;
 
 import static com.stash.hunt.Utils.*;
 
@@ -177,10 +184,18 @@ public class ElytraFlyPlusPlus extends Module {
         .build()
     );
 
+    private final Setting<Boolean> fakeFly = sgGeneral.add(new BoolSetting.Builder()
+        .name("Chestplate / Fakefly")
+        .description("Lets you fly using a chestplate to use almost 0 elytra durability. Must have elytra in hotbar.")
+        .defaultValue(false)
+        .build()
+    );
+
     private final Setting<Boolean> toggleElytra = sgGeneral.add(new BoolSetting.Builder()
         .name("Toggle Elytra")
         .description("Equips an elytra on activate, and a chestplate on deactivate.")
         .defaultValue(false)
+        .visible(() -> !fakeFly.get())
         .build()
     );
 
@@ -272,7 +287,7 @@ public class ElytraFlyPlusPlus extends Module {
 
         mc.player.setSprinting(startSprinting);
 
-        if (toggleElytra.get())
+        if (toggleElytra.get() && !fakeFly.get())
         {
             if (!mc.player.getEquippedStack(EquipmentSlot.CHEST).getItem().toString().contains("chestplate")) {
                 Modules.get().get(ChestSwap.class).swap();
@@ -294,7 +309,7 @@ public class ElytraFlyPlusPlus extends Module {
     {
         if (mc.player == null || mc.player.getAbilities().allowFlying) return;
 
-        if (toggleElytra.get() && !elytraToggled)
+        if (toggleElytra.get() && !fakeFly.get() && !elytraToggled)
         {
             if (!(mc.player.getEquippedStack(EquipmentSlot.CHEST).getItem().equals(Items.ELYTRA)))
             {
@@ -407,16 +422,93 @@ public class ElytraFlyPlusPlus extends Module {
 
         if (enabled())
         {
-            mc.player.networkHandler.sendPacket(new ClientCommandC2SPacket(
-                mc.player,
-                ClientCommandC2SPacket.Mode.START_FALL_FLYING
-            ));
+            if (fakeFly.get())
+            {
+                doGrimEflyStuff();
+            }
+            else
+            {
+                sendStartFlyingPacket();
+            }
         }
     }
 
     public boolean enabled()
     {
-        return this.isActive() && !paused && mc.player != null && mc.player.getEquippedStack(EquipmentSlot.CHEST).getItem().toString().contains("elytra");
+        return this.isActive() && !paused && mc.player != null && (fakeFly.get() || mc.player.getEquippedStack(EquipmentSlot.CHEST).getItem().equals(Items.ELYTRA));
+    }
+
+    private void doGrimEflyStuff()
+    {
+        FindItemResult itemResult = InvUtils.findInHotbar(Items.ELYTRA);
+        if (!itemResult.found()) return;
+
+        swapToItem(itemResult.slot());
+
+        sendStartFlyingPacket();
+
+        swapToItem(itemResult.slot());
+
+        if (Utils.canOpenGui()) {
+            mc.player.networkHandler.sendPacket(new CloseHandledScreenC2SPacket(mc.player.currentScreenHandler.syncId));
+        }
+    }
+
+    @EventHandler
+    private void onPlaySound(PlaySoundEvent event)
+    {
+        List<Identifier> armorEquipSounds = List.of(
+            Identifier.of("minecraft:item.armor.equip_generic"),
+            Identifier.of("minecraft:item.armor.equip_netherite"),
+            Identifier.of("minecraft:item.armor.equip_diamond"),
+            Identifier.of("minecraft:item.armor.equip_gold"),
+            Identifier.of("minecraft:item.armor.equip_iron"),
+            Identifier.of("minecraft:item.armor.equip_chain"),
+            Identifier.of("minecraft:item.armor.equip_leather"),
+            Identifier.of("minecraft:item.elytra.flying")
+        );
+        for (Identifier identifier : armorEquipSounds) {
+            if (identifier.equals(event.sound.getId())) {
+                event.cancel();
+                break;
+            }
+        }
+    }
+
+    // 38 is the meteor mapping for chestplate
+    // serverside uses default mappings: https://imgs.search.brave.com/cyvAxjIhLweeF1qeRXpC_8ESRlImhUmMGWbV_n2to_A/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly9jNGsz/LmdpdGh1Yi5pby93/aWtpLnZnL2ltYWdl/cy8xLzEzL0ludmVu/dG9yeS1zbG90cy5w/bmc
+    private void swapToItem(int slot) {
+        ItemStack chestItem = mc.player.getInventory().getStack(38);
+        ItemStack hotbarSwapItem = mc.player.getInventory().getStack(slot);
+
+        Int2ObjectMap<ItemStack> changedSlots = new Int2ObjectOpenHashMap<>();
+        changedSlots.put(6, hotbarSwapItem);
+        changedSlots.put(slot + 36, chestItem);
+
+        sendSwapPacket(changedSlots, slot);
+    }
+
+    private void sendStartFlyingPacket() {
+        if (mc.player == null) return;
+        mc.player.networkHandler.sendPacket(new ClientCommandC2SPacket(
+            mc.player,
+            ClientCommandC2SPacket.Mode.START_FALL_FLYING
+        ));
+    }
+
+    private void sendSwapPacket(Int2ObjectMap<ItemStack> changedSlots, int buttonNum) {
+        int syncId  = mc.player.currentScreenHandler.syncId;
+        int stateId = mc.player.currentScreenHandler.getRevision();
+
+        mc.player.networkHandler.sendPacket(new ClickSlotC2SPacket(
+            syncId,
+            stateId,
+            6,                 // slotNum
+            buttonNum,   // the slot number thats being swapped
+            SlotActionType.SWAP,
+            new ItemStack(Items.AIR),
+            changedSlots
+        ));
     }
 
     @EventHandler
