@@ -44,9 +44,10 @@ public class AFKVanillaFly extends Module {
     private final Setting<Integer> manualYLevel = sgGeneral.add(new IntSetting.Builder()
         .name("Manual Y Level")
         .description("The Y level to maintain when using manual Y level.")
-        .defaultValue(120)
+        .defaultValue(256)
         .sliderRange(-64, 320)
         .visible(useManualY::get)
+        .onChanged(val -> yTarget = val)
         .build()
     );
 
