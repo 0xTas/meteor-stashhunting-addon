@@ -397,15 +397,18 @@ public class ElytraFlyPlusPlus extends Module {
                 paused = false;
                 if (!enabled()) return;
 
-                double playerSpeed = Utils.getPlayerSpeed().multiply(1, 0, 1).length();
-                if (motionYBoost.get() && mc.player.getVelocity().y > 0 && playerSpeed < speed.get())
+                if (!fakeFly.get())
                 {
-                    mc.player.setVelocity(mc.player.getVelocity().x, 0.0, mc.player.getVelocity().z);
-                }
+                    double playerSpeed = Utils.getPlayerSpeed().multiply(1, 0, 1).length();
+                    if (motionYBoost.get() && mc.player.getVelocity().y > 0 && playerSpeed < speed.get())
+                    {
+                        mc.player.setVelocity(mc.player.getVelocity().x, 0.0, mc.player.getVelocity().z);
+                    }
 
-                if (mc.player.isOnGround())
-                {
-                    mc.player.jump();
+                    if (mc.player.isOnGround())
+                    {
+                        mc.player.jump();
+                    }
                 }
 
                 // set yaw and pitch
@@ -445,7 +448,18 @@ public class ElytraFlyPlusPlus extends Module {
 
         swapToItem(itemResult.slot());
 
+        double playerSpeed = Utils.getPlayerSpeed().multiply(1, 0, 1).length();
+        if (bounce.get() && motionYBoost.get() && mc.player.getVelocity().y > 0 && playerSpeed < speed.get())
+        {
+            mc.player.setVelocity(mc.player.getVelocity().x, 0.0, mc.player.getVelocity().z);
+        }
+
         sendStartFlyingPacket();
+
+        if (bounce.get() && mc.player.isOnGround())
+        {
+            mc.player.jump();
+        }
 
         swapToItem(itemResult.slot());
 
