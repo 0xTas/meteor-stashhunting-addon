@@ -4,7 +4,6 @@ import baritone.api.BaritoneAPI;
 import baritone.api.pathing.goals.GoalBlock;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
-import meteordevelopment.meteorclient.events.entity.player.InteractItemEvent;
 import meteordevelopment.meteorclient.events.packets.PacketEvent;
 import meteordevelopment.meteorclient.events.world.ChunkDataEvent;
 import meteordevelopment.meteorclient.events.world.PlaySoundEvent;
@@ -19,17 +18,14 @@ import meteordevelopment.meteorclient.utils.player.InvUtils;
 import meteordevelopment.orbit.EventHandler;
 import net.minecraft.block.Blocks;
 import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.item.FireworkRocketItem;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.network.packet.c2s.play.*;
-import net.minecraft.network.packet.s2c.play.HealthUpdateS2CPacket;
+import net.minecraft.network.packet.s2c.play.CloseScreenS2CPacket;
 import net.minecraft.network.packet.s2c.play.PlayerPositionLookS2CPacket;
-import net.minecraft.network.packet.s2c.play.PlayerSpawnPositionS2CPacket;
 
 import com.stash.hunt.Addon;
 import net.minecraft.screen.slot.SlotActionType;
-import net.minecraft.util.Hand;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
@@ -219,6 +215,10 @@ public class ElytraFlyPlusPlus extends Module {
         if (event.packet instanceof PlayerPositionLookS2CPacket packet)
         {
             onActivate();
+        }
+        else if (event.packet instanceof CloseScreenS2CPacket)
+        {
+            event.cancel();
         }
     }
 
@@ -463,9 +463,6 @@ public class ElytraFlyPlusPlus extends Module {
 
         swapToItem(itemResult.slot());
 
-        if (Utils.canOpenGui()) {
-            mc.player.networkHandler.sendPacket(new CloseHandledScreenC2SPacket(mc.player.currentScreenHandler.syncId));
-        }
     }
 
     @EventHandler
