@@ -15,7 +15,6 @@ import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.systems.modules.Modules;
 import meteordevelopment.meteorclient.systems.modules.player.ChestSwap;
 import meteordevelopment.meteorclient.systems.modules.world.Timer;
-import meteordevelopment.meteorclient.utils.Utils;
 import meteordevelopment.meteorclient.utils.player.FindItemResult;
 import meteordevelopment.meteorclient.utils.player.InvUtils;
 import meteordevelopment.orbit.EventHandler;
@@ -63,7 +62,7 @@ public class ElytraFlyPlusPlus extends Module {
         .name("Speed")
         .description("The speed in blocks per second to keep you at.")
         .defaultValue(100.0)
-        .range(20, 250)
+        .sliderRange(20, 250)
         .visible(() -> bounce.get() && motionYBoost.get())
         .build()
     );
@@ -393,8 +392,8 @@ public class ElytraFlyPlusPlus extends Module {
             if (highwayObstaclePasser.get() && mc.player.getPos().length() > 100 && // > 100 check needed bc server sends queue coordinates when joining in first tick causing goal coordinates to be set to (0, 0)
                 (mc.player.getY() < targetY.get() || mc.player.getY() > targetY.get() + 2 || mc.player.horizontalCollision) // collisions / out of highway
                 || (portalTrap != null && portalTrap.getSquaredDistance(mc.player.getBlockPos()) < portalAvoidDistance.get() * portalAvoidDistance.get()) // portal trap detection
-                || waitingForChunksToLoad
-                || stuckTimer > 100) // waiting for chunks to load
+                || waitingForChunksToLoad // waiting for chunks to load
+                || stuckTimer > 100)
             {
                 waitingForChunksToLoad = false;
                 paused = true;
