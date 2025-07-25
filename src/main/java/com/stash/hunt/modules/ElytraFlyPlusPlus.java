@@ -58,6 +58,14 @@ public class ElytraFlyPlusPlus extends Module {
         .build()
     );
 
+    private final Setting<Boolean> tunnelBounce = sgGeneral.add(new BoolSetting.Builder()
+        .name("Tunnel Bounce")
+        .description("Allows you to bounce in 1x2 tunnels.")
+        .defaultValue(false)
+        .visible(() -> bounce.get() && motionYBoost.get())
+        .build()
+    );
+
     private final Setting<Double> speed = sgGeneral.add(new DoubleSetting.Builder()
         .name("Speed")
         .description("The speed in blocks per second to keep you at.")
@@ -149,7 +157,7 @@ public class ElytraFlyPlusPlus extends Module {
 
     private final Setting<Integer> targetY = sgObstaclePasser.add(new IntSetting.Builder()
         .name("Y Level")
-        .description("The Y level to bounce at.")
+        .description("The Y level to bounce at. This must be correct or bounce will not start properly.")
         .defaultValue(120)
         .visible(() -> bounce.get() && highwayObstaclePasser.get())
         .build()
@@ -298,7 +306,7 @@ public class ElytraFlyPlusPlus extends Module {
 
             if (mc.player.isOnGround() && mc.player.isSprinting() && speedBps < speed.get())
             {
-                if (speedBps > 20)
+                if (speedBps > 20 || tunnelBounce.get())
                 {
                     ((IVec3d) event.movement).setY(0.0);
                 }
