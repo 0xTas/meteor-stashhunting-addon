@@ -106,6 +106,7 @@ public class ElytraFlyPlusPlus extends Module {
             .name("auto-glide")
             .description("Stops spoofing your pitch if you rise up high enough above the ground.")
             .defaultValue(true)
+            .visible(bounce::get)
             .build()
     );
     private final Setting<Integer> glideThreshold = sgGeneral.add(
@@ -113,52 +114,69 @@ public class ElytraFlyPlusPlus extends Module {
             .name("glide-threshold")
             .min(1).sliderMin(1)
             .defaultValue(1)
-            .visible(autoGlide::get)
+            .visible(() -> bounce.get() && autoGlide.get())
             .build()
     );
     private final Setting<Keybind> glideKey = sgGeneral.add(
         new KeybindSetting.Builder()
             .name("glide-key")
-            .description("The key to press for manual gliding (or pitch-spoofing if spoof pitch is disabled).")
+            .description("The key to press for manual gliding (or pitch-spoofing if Spoof Pitch is disabled).")
             .defaultValue(Keybind.none())
+            .visible(bounce::get)
             .build()
     );
 
-    public final Setting<Boolean> spoofPitch = sgGeneral.add(new BoolSetting.Builder()
-        .name("spoof-pitch")
-        .description("Whether to spoof your pitch when bounce is enabled.")
-        .defaultValue(true)
-        .build()
+    public final Setting<Boolean> spoofPitch = sgGeneral.add(
+        new BoolSetting.Builder()
+            .name("spoof-pitch")
+            .description("Whether to spoof your pitch when bounce is enabled.")
+            .defaultValue(true)
+            .visible(bounce::get)
+            .build()
     );
 
-    public final Setting<Double> pitch = sgGeneral.add(new DoubleSetting.Builder()
-        .name("pitch")
-        .description("The pitch to set when bounce is enabled.")
-        .defaultValue(75.0)
-        .build()
+    public final Setting<Double> pitch = sgGeneral.add(
+        new DoubleSetting.Builder()
+            .name("pitch")
+            .description("The pitch to set when bounce is enabled.")
+            .defaultValue(75.0)
+            .visible(() -> bounce.get() && spoofPitch.get())
+            .build()
     );
 
-    public final Setting<Boolean> spoofYaw = sgGeneral.add(new BoolSetting.Builder()
-        .name("spoof-yaw")
-        .description("Whether to spoof your yaw when bounce is enabled.")
-        .defaultValue(false)
-        .build()
+    public final Setting<Boolean> spoofYaw = sgGeneral.add(
+        new BoolSetting.Builder()
+            .name("spoof-yaw")
+            .description("Whether to spoof your yaw when bounce is enabled.")
+            .defaultValue(false)
+            .visible(bounce::get)
+            .build()
     );
 
-    private final Setting<Boolean> autoYaw = sgGeneral.add(new BoolSetting.Builder()
-        .name("auto-yaw")
-        .description("Disable this if you want to use a custom yaw value.")
-        .defaultValue(true)
-        .visible(spoofYaw::get)
-        .build()
+    private final Setting<Boolean> autoYaw = sgGeneral.add(
+        new BoolSetting.Builder()
+            .name("auto-yaw")
+            .description("Disable this if you want to use a custom yaw value.")
+            .defaultValue(true)
+            .visible(() -> bounce.get() && spoofYaw.get())
+            .build()
     );
 
-    private final Setting<Double> yaw = sgGeneral.add(new DoubleSetting.Builder()
-        .name("yaw")
-        .description("The yaw to set when bounce is enabled. This is auto set to the closest 45 deg angle to you unless Auto Yaw is disabled.")
-        .defaultValue(0.0)
-        .visible(() -> !autoYaw.get() && autoYaw.isVisible())
-        .build()
+    private final Setting<Double> yaw = sgGeneral.add(
+        new DoubleSetting.Builder()
+            .name("yaw")
+            .description("The yaw to set when bounce is enabled. This is auto set to the closest 45 deg angle to you unless Auto Yaw is disabled.")
+            .defaultValue(0.0)
+            .visible(() -> !autoYaw.get() && autoYaw.isVisible())
+            .build()
+    );
+
+    public final Setting<Boolean> stand = sgGeneral.add(
+        new BoolSetting.Builder()
+            .name("remain-standing")
+            .description("Remain in a standing pose when deploying your elytra.")
+            .defaultValue(true)
+            .build()
     );
 
     private final Setting<Boolean> highwayObstaclePasser = sgObstaclePasser.add(new BoolSetting.Builder()
