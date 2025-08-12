@@ -5,20 +5,26 @@ import baritone.api.pathing.goals.GoalBlock;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import meteordevelopment.meteorclient.events.entity.player.PlayerMoveEvent;
+import meteordevelopment.meteorclient.events.meteor.MouseScrollEvent;
 import meteordevelopment.meteorclient.events.packets.PacketEvent;
 import meteordevelopment.meteorclient.events.world.ChunkDataEvent;
 import meteordevelopment.meteorclient.events.world.PlaySoundEvent;
 import meteordevelopment.meteorclient.events.world.TickEvent;
+import meteordevelopment.meteorclient.mixininterface.IChatHud;
 import meteordevelopment.meteorclient.mixininterface.IVec3d;
 import meteordevelopment.meteorclient.settings.*;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.systems.modules.Modules;
 import meteordevelopment.meteorclient.systems.modules.player.ChestSwap;
+import meteordevelopment.meteorclient.systems.modules.render.Freecam;
 import meteordevelopment.meteorclient.systems.modules.world.Timer;
 import meteordevelopment.meteorclient.utils.Utils;
+import meteordevelopment.meteorclient.utils.misc.Keybind;
+import meteordevelopment.meteorclient.utils.misc.input.Input;
 import meteordevelopment.meteorclient.utils.player.FindItemResult;
 import meteordevelopment.meteorclient.utils.player.InvUtils;
 import meteordevelopment.orbit.EventHandler;
+import meteordevelopment.orbit.EventPriority;
 import net.minecraft.block.Blocks;
 import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.MovementType;
@@ -30,10 +36,13 @@ import net.minecraft.network.packet.s2c.play.PlayerPositionLookS2CPacket;
 
 import com.stash.hunt.Addon;
 import net.minecraft.screen.slot.SlotActionType;
+import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
+import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
+import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
 
@@ -44,15 +53,15 @@ public class ElytraFlyPlusPlus extends Module {
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
     private final SettingGroup sgObstaclePasser = settings.createGroup("Obstacle Passer");
 
-    private final Setting<Boolean> bounce = sgGeneral.add(new BoolSetting.Builder()
-        .name("Bounce")
+    public final Setting<Boolean> bounce = sgGeneral.add(new BoolSetting.Builder()
+        .name("bounce")
         .description("Automatically does bounce efly.")
         .defaultValue(false)
         .build()
     );
 
     private final Setting<Boolean> motionYBoost = sgGeneral.add(new BoolSetting.Builder()
-        .name("Motion Y Boost")
+        .name("motion-y-boost")
         .description("Greatly increases speed by cancelling Y momentum.")
         .defaultValue(false)
         .visible(bounce::get)
@@ -60,7 +69,7 @@ public class ElytraFlyPlusPlus extends Module {
     );
 
     private final Setting<Boolean> tunnelBounce = sgGeneral.add(new BoolSetting.Builder()
-        .name("Tunnel Bounce")
+        .name("tunnel-bounce")
         .description("Allows you to bounce in 1x2 tunnels. This should not be on if you are not in a tunnel.")
         .defaultValue(false)
         .visible(() -> bounce.get() && motionYBoost.get())
@@ -68,58 +77,92 @@ public class ElytraFlyPlusPlus extends Module {
     );
 
     private final Setting<Double> speed = sgGeneral.add(new DoubleSetting.Builder()
-        .name("Speed")
+        .name("speed")
         .description("The speed in blocks per second to keep you at.")
         .defaultValue(100.0)
         .sliderRange(20, 250)
         .visible(() -> bounce.get() && motionYBoost.get())
         .build()
     );
+    private final Setting<Double> scrollSensitivity = sgGeneral.add(
+        new DoubleSetting.Builder()
+            .name("speed-scroll-sensitivity")
+            .description("Hold ctrl while scrolling the mouse wheel to change your max speed. Set to 0 to disable.")
+            .min(0).sliderMin(0).sliderMax(25)
+            .defaultValue(10)
+            .visible(() -> bounce.get() && motionYBoost.get())
+            .build()
+    );
+    public final Setting<Boolean> scrollSpeedFeedback = sgGeneral.add(
+        new BoolSetting.Builder()
+            .name("scroll-speed-feedback")
+            .description("Display a message in chat indicating speed value changes triggered by the scroll wheel.")
+            .defaultValue(true)
+            .visible(() -> bounce.get() && motionYBoost.get() & scrollSensitivity.get() > 0)
+            .build()
+    );
+    private final Setting<Boolean> autoGlide = sgGeneral.add(
+        new BoolSetting.Builder()
+            .name("auto-glide")
+            .description("Stops spoofing your pitch if you rise up high enough above the ground.")
+            .defaultValue(true)
+            .build()
+    );
+    private final Setting<Integer> glideThreshold = sgGeneral.add(
+        new IntSetting.Builder()
+            .name("glide-threshold")
+            .min(1).sliderMin(1)
+            .defaultValue(1)
+            .visible(autoGlide::get)
+            .build()
+    );
+    private final Setting<Keybind> glideKey = sgGeneral.add(
+        new KeybindSetting.Builder()
+            .name("glide-key")
+            .description("The key to press for manual gliding (or pitch-spoofing if spoof pitch is disabled).")
+            .defaultValue(Keybind.none())
+            .build()
+    );
 
-    private final Setting<Boolean> lockPitch = sgGeneral.add(new BoolSetting.Builder()
-        .name("Lock Pitch")
-        .description("Whether to lock your pitch when bounce is enabled.")
+    public final Setting<Boolean> spoofPitch = sgGeneral.add(new BoolSetting.Builder()
+        .name("spoof-pitch")
+        .description("Whether to spoof your pitch when bounce is enabled.")
         .defaultValue(true)
-        .visible(bounce::get)
         .build()
     );
 
-    private final Setting<Double> pitch = sgGeneral.add(new DoubleSetting.Builder()
-        .name("Pitch")
+    public final Setting<Double> pitch = sgGeneral.add(new DoubleSetting.Builder()
+        .name("pitch")
         .description("The pitch to set when bounce is enabled.")
-        .defaultValue(90.0)
-        .sliderRange(-90, 90)
-        .visible(() -> bounce.get() && lockPitch.get())
+        .defaultValue(75.0)
         .build()
     );
 
-    private final Setting<Boolean> lockYaw = sgGeneral.add(new BoolSetting.Builder()
-        .name("Lock Yaw")
-        .description("Whether to lock your yaw when bounce is enabled.")
+    public final Setting<Boolean> spoofYaw = sgGeneral.add(new BoolSetting.Builder()
+        .name("spoof-yaw")
+        .description("Whether to spoof your yaw when bounce is enabled.")
         .defaultValue(false)
-        .visible(bounce::get)
         .build()
     );
 
-    private final Setting<Boolean> useCustomYaw = sgGeneral.add(new BoolSetting.Builder()
-        .name("Use Custom Yaw")
-        .description("Enable this if you want to use a yaw that isn't a factor of 45.")
-        .defaultValue(false)
-        .visible(bounce::get)
+    private final Setting<Boolean> autoYaw = sgGeneral.add(new BoolSetting.Builder()
+        .name("auto-yaw")
+        .description("Disable this if you want to use a custom yaw value.")
+        .defaultValue(true)
+        .visible(spoofYaw::get)
         .build()
     );
 
     private final Setting<Double> yaw = sgGeneral.add(new DoubleSetting.Builder()
-        .name("Yaw")
-        .description("The yaw to set when bounce is enabled. This is auto set to the closest 45 deg angle to you unless Use Custom Yaw is enabled.")
+        .name("yaw")
+        .description("The yaw to set when bounce is enabled. This is auto set to the closest 45 deg angle to you unless Auto Yaw is disabled.")
         .defaultValue(0.0)
-        .sliderRange(0, 359)
-        .visible(() -> bounce.get() && useCustomYaw.get())
+        .visible(() -> !autoYaw.get() && autoYaw.isVisible())
         .build()
     );
 
     private final Setting<Boolean> highwayObstaclePasser = sgObstaclePasser.add(new BoolSetting.Builder()
-        .name("Highway Obstacle Passer")
+        .name("highway-obstacle-passer")
         .description("Uses baritone to pass obstacles.")
         .defaultValue(false)
         .visible(bounce::get)
@@ -127,7 +170,7 @@ public class ElytraFlyPlusPlus extends Module {
     );
 
     private final Setting<Boolean> useCustomStartPos = sgObstaclePasser.add(new BoolSetting.Builder()
-        .name("Use Custom Start Position")
+        .name("use-custom-start-position")
         .description("Enable and set this ONLY if you are on a ringroad or don't want to be locked to a highway. Otherwise (0, 0) is the start position and will be automatically used.")
         .defaultValue(false)
         .visible(() -> bounce.get() && highwayObstaclePasser.get())
@@ -135,7 +178,7 @@ public class ElytraFlyPlusPlus extends Module {
     );
 
     private final Setting<BlockPos> startPos = sgObstaclePasser.add(new BlockPosSetting.Builder()
-        .name("Start Position")
+        .name("start-position")
         .description("The start position to use when using a custom start position.")
         .defaultValue(new BlockPos(0,0,0))
         .visible(() -> bounce.get() && highwayObstaclePasser.get() && useCustomStartPos.get())
@@ -143,7 +186,7 @@ public class ElytraFlyPlusPlus extends Module {
     );
 
     private final Setting<Boolean> awayFromStartPos = sgObstaclePasser.add(new BoolSetting.Builder()
-        .name("Away From Start Position")
+        .name("away-from-start-position")
         .description("If true, will go away from the start position instead of towards it. The start pos is (0,0) if it is not set to a custom start pos.")
         .defaultValue(true)
         .visible(() -> bounce.get() && highwayObstaclePasser.get())
@@ -151,7 +194,7 @@ public class ElytraFlyPlusPlus extends Module {
     );
 
     private final Setting<Double> distance = sgObstaclePasser.add(new DoubleSetting.Builder()
-        .name("Distance")
+        .name("distance")
         .description("The distance to set the baritone goal for path realignment.")
         .defaultValue(10.0)
         .visible(() -> bounce.get() && highwayObstaclePasser.get())
@@ -159,7 +202,7 @@ public class ElytraFlyPlusPlus extends Module {
     );
 
     private final Setting<Integer> targetY = sgObstaclePasser.add(new IntSetting.Builder()
-        .name("Y Level")
+        .name("y-level")
         .description("The Y level to bounce at. This must be correct or bounce will not start properly.")
         .defaultValue(120)
         .visible(() -> bounce.get() && highwayObstaclePasser.get())
@@ -167,7 +210,7 @@ public class ElytraFlyPlusPlus extends Module {
     );
 
     private final Setting<Boolean> avoidPortalTraps = sgObstaclePasser.add(new BoolSetting.Builder()
-        .name("Avoid Portal Traps")
+        .name("avoid-portal-traps")
         .description("Will attempt to detect portal traps on chunk load and avoid them.")
         .defaultValue(false)
         .visible(() -> bounce.get() && highwayObstaclePasser.get())
@@ -175,7 +218,7 @@ public class ElytraFlyPlusPlus extends Module {
     );
 
     private final Setting<Double> portalAvoidDistance = sgObstaclePasser.add(new DoubleSetting.Builder()
-        .name("Portal Avoid Distance")
+        .name("portal-avoid-distance")
         .description("The distance to a portal trap where the obstacle passer will takeover and go around it.")
         .defaultValue(20)
         .min(0)
@@ -185,7 +228,7 @@ public class ElytraFlyPlusPlus extends Module {
     );
 
     private final Setting<Integer> portalScanWidth = sgObstaclePasser.add(new IntSetting.Builder()
-        .name("Portal Scan Width")
+        .name("portal-scan-width")
         .description("The width on the axis of the highway that will be scanned for portal traps.")
         .defaultValue(5)
         .min(3)
@@ -195,14 +238,14 @@ public class ElytraFlyPlusPlus extends Module {
     );
 
     private final Setting<Boolean> fakeFly = sgGeneral.add(new BoolSetting.Builder()
-        .name("Chestplate / Fakefly")
+        .name("fakeFly")
         .description("Lets you fly using a chestplate to use almost 0 elytra durability. Must have elytra in hotbar.")
         .defaultValue(false)
         .build()
     );
 
     private final Setting<Boolean> toggleElytra = sgGeneral.add(new BoolSetting.Builder()
-        .name("Toggle Elytra")
+        .name("toggle-elytra")
         .description("Equips an elytra on activate, and a chestplate on deactivate.")
         .defaultValue(false)
         .visible(() -> !fakeFly.get())
@@ -217,9 +260,15 @@ public class ElytraFlyPlusPlus extends Module {
         );
     }
 
+    public float camYaw = 0.0f;
+    public float camPitch = 0.0f;
     private boolean startSprinting;
     private BlockPos portalTrap = null;
     private boolean paused = false;
+    private boolean gliding = false;
+    private boolean spoofOverride = false;
+    private final BlockPos.Mutable testPos1 = new BlockPos.Mutable();
+    private final BlockPos.Mutable testPos2 = new BlockPos.Mutable();
 
     private boolean elytraToggled = false;
 
@@ -244,10 +293,15 @@ public class ElytraFlyPlusPlus extends Module {
     {
         if (mc.player == null || mc.player.getAbilities().allowFlying) return;
 
+        camYaw = mc.player.getYaw();
+        camPitch = mc.player.getPitch();
+
         startSprinting = mc.player.isSprinting();
         tempPath = null;
         portalTrap = null;
         paused = false;
+        gliding = false;
+        spoofOverride = false;
         waitingForChunksToLoad = false;
         elytraToggled = false;
         lastPos = mc.player.getPos();
@@ -255,7 +309,7 @@ public class ElytraFlyPlusPlus extends Module {
         stuckTimer = 0;
 
         // I don't know any other way to fix this stupid shit
-        if (bounce.get() && mc.player.getPos().multiply(1, 0, 1).length() >= 100)
+        if (bounce.get() && mc.player.getVelocity().horizontalLength() >= 100)
         {
             if (BaritoneAPI.getProvider().getPrimaryBaritone().getElytraProcess().currentDestination() == null)
             {
@@ -264,10 +318,10 @@ public class ElytraFlyPlusPlus extends Module {
 
             if (!useCustomStartPos.get())
             {
-                startPos.set(new BlockPos(0, 0, 0));
+                startPos.set(new BlockPos(0, targetY.get(), 0));
             }
 
-            if (!useCustomYaw.get())
+            if (autoYaw.get())
             {
                 // If less than 100 blocks from the start pos, angle calculation may be wrong, so just use players yaw
                 if (mc.player.getBlockPos().getSquaredDistance(startPos.get()) < 10_000 || !highwayObstaclePasser.get())
@@ -295,7 +349,8 @@ public class ElytraFlyPlusPlus extends Module {
     private Vec3d lastPos;
 
     @EventHandler
-    private void onPlayerMove(PlayerMoveEvent event) {
+    private void onPlayerMove(PlayerMoveEvent event)
+    {
         if (mc.player == null || event.type != MovementType.SELF || !enabled() || !motionYBoost.get() || !bounce.get()) return;
 
         if (lastPos != null)
@@ -303,7 +358,8 @@ public class ElytraFlyPlusPlus extends Module {
             double speedBps = mc.player.getPos().subtract(lastPos).multiply(20, 0, 20).length();
 
             Timer timer = Modules.get().get(Timer.class);
-            if (timer.isActive()) {
+            if (timer.isActive())
+            {
                 speedBps *= timer.getMultiplier();
             }
 
@@ -341,9 +397,17 @@ public class ElytraFlyPlusPlus extends Module {
                 Modules.get().get(ChestSwap.class).swap();
             }
         }
+
+        if (spoofYaw.get()) {
+            mc.player.setYaw(camYaw);
+        }
+        if (shouldSpoofPitch()) {
+            mc.player.setPitch(camPitch);
+        }
     }
 
     // 5 chunks forwards
+    @SuppressWarnings("FieldCanBeLocal")
     private final double maxDistance = 16 * 5;
 
     // a path used when there are no valid blocks in range.
@@ -355,6 +419,7 @@ public class ElytraFlyPlusPlus extends Module {
     @EventHandler
     private void onTick(TickEvent.Pre event)
     {
+        if (mc.world == null) return;
         if (mc.player == null || mc.player.getAbilities().allowFlying) return;
 
         if (toggleElytra.get() && !fakeFly.get() && !elytraToggled)
@@ -373,6 +438,47 @@ public class ElytraFlyPlusPlus extends Module {
 
         if (bounce.get())
         {
+            testPos1.set(mc.player.getBlockPos());
+            testPos2.set(mc.player.getBlockPos().down(glideThreshold.get()));
+
+            boolean foundGround = false;
+            while (testPos1.getY() >= testPos2.getY())
+            {
+                if (foundGround) break;
+                testPos1.set(testPos1.down());
+                foundGround = !mc.world.getBlockState(testPos1).isReplaceable();
+            }
+
+            if (spoofPitch.get())
+            {
+                if (foundGround && !glideKey.get().isPressed())
+                {
+                    if (gliding)
+                    {
+                        gliding = false;
+                        camPitch = mc.player.getPitch(mc.getRenderTickCounter().getTickDelta(true));
+                    }
+                }
+                else if (!gliding && ((autoGlide.get() && !foundGround) || glideKey.get().isPressed()))
+                {
+                    gliding = true;
+                    mc.player.setPitch(camPitch);
+                }
+            }
+            else if (glideKey.get().isPressed())
+            {
+                if (!spoofOverride)
+                {
+                    spoofOverride = true;
+                    camPitch = mc.player.getPitch(mc.getRenderTickCounter().getTickDelta(true));
+                }
+            }
+            else if (spoofOverride)
+            {
+                spoofOverride = false;
+                mc.player.setPitch(camPitch);
+            }
+
             if (tempPath != null && mc.player.getBlockPos().getSquaredDistance(tempPath) < 500)
             {
                 tempPath = null;
@@ -465,13 +571,19 @@ public class ElytraFlyPlusPlus extends Module {
                 }
 
                 // set yaw and pitch
-                if (lockYaw.get())
+                if (spoofYaw.get())
                 {
                     mc.player.setYaw(yaw.get().floatValue());
                 }
-                if (lockPitch.get())
+                if (shouldSpoofPitch())
                 {
-                    mc.player.setPitch(pitch.get().floatValue());
+                    float target = pitch.get().floatValue();
+                    float current = mc.player.getPitch(mc.getRenderTickCounter().getTickDelta(true));
+
+                    float delta = MathHelper.wrapDegrees(target - current);
+                    float smoothedPitch = (float) (current + (delta * 0.2));
+
+                    mc.player.setPitch(smoothedPitch);
                 }
             }
         }
@@ -489,9 +601,53 @@ public class ElytraFlyPlusPlus extends Module {
         }
     }
 
+    @EventHandler
+    private void onTick(TickEvent.Post event)
+    {
+        if (mc.player == null) return;
+        if (shouldSpoofPitch())
+        {
+            camPitch = MathHelper.clamp(camPitch, -90, 90);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    private void onScrollWheel(MouseScrollEvent event)
+    {
+        Modules mods = Modules.get();
+        if (scrollSensitivity.get() <= 0) return;
+        if (mc.currentScreen != null || !motionYBoost.get()) return;
+        if (mods == null || mods.get(Freecam.class).isActive()) return;
+
+        if (Input.isKeyPressed(GLFW.GLFW_KEY_LEFT_CONTROL))
+        {
+            event.cancel();
+            double newSpeed = Math.max(speed.get() + (event.value * scrollSensitivity.get()), 0);
+            if (scrollSpeedFeedback.get() && chatFeedback) ((IChatHud) mc.inGameHud.getChatHud()).meteor$add(
+                Text.literal("§7Speed: §3"+String.valueOf(newSpeed).substring(0, Math.min(5, String.valueOf(newSpeed).length()))),
+                "bounceSpeedScroll".hashCode()
+            );
+
+            speed.set(Math.max(newSpeed, 1));
+        }
+    }
+
     public boolean enabled()
     {
-        return this.isActive() && !paused && mc.player != null && (fakeFly.get() || mc.player.getEquippedStack(EquipmentSlot.CHEST).getItem().equals(Items.ELYTRA));
+        return this.isActive()
+            && !paused && mc.player != null
+            && (fakeFly.get() || mc.player.getEquippedStack(EquipmentSlot.CHEST).getItem().equals(Items.ELYTRA));
+    }
+
+    // See MouseMixin.java && CameraMixin.java
+    public boolean shouldSpoofPitch()
+    {
+        if (gliding) return false;
+        if (spoofOverride) return true;
+        if (!spoofPitch.get()) return false;
+        if (mc.player == null || mc.world == null) return false;
+
+        return !paused;
     }
 
     private void doGrimEflyStuff()
@@ -536,7 +692,8 @@ public class ElytraFlyPlusPlus extends Module {
 
     // 38 is the meteor mapping for chestplate
     // serverside uses default mappings: https://imgs.search.brave.com/cyvAxjIhLweeF1qeRXpC_8ESRlImhUmMGWbV_n2to_A/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly9jNGsz/LmdpdGh1Yi5pby93/aWtpLnZnL2ltYWdl/cy8xLzEzL0ludmVu/dG9yeS1zbG90cy5w/bmc
-    private void swapToItem(int slot) {
+    private void swapToItem(int slot)
+    {
         ItemStack chestItem = mc.player.getInventory().getStack(38);
         ItemStack hotbarSwapItem = mc.player.getInventory().getStack(slot);
 
@@ -547,7 +704,8 @@ public class ElytraFlyPlusPlus extends Module {
         sendSwapPacket(changedSlots, slot);
     }
 
-    private void sendStartFlyingPacket() {
+    private void sendStartFlyingPacket()
+    {
         if (mc.player == null) return;
         mc.player.networkHandler.sendPacket(new ClientCommandC2SPacket(
             mc.player,
@@ -555,7 +713,8 @@ public class ElytraFlyPlusPlus extends Module {
         ));
     }
 
-    private void sendSwapPacket(Int2ObjectMap<ItemStack> changedSlots, int buttonNum) {
+    private void sendSwapPacket(Int2ObjectMap<ItemStack> changedSlots, int buttonNum)
+    {
         int syncId  = mc.player.currentScreenHandler.syncId;
         int stateId = mc.player.currentScreenHandler.getRevision();
 
