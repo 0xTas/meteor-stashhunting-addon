@@ -140,6 +140,7 @@ public class ElytraFlyPlusPlus extends Module {
             .name("pitch")
             .description("The pitch to set when bounce is enabled.")
             .defaultValue(75.0)
+            .sliderRange(-90, 90)
             .visible(() -> bounce.get() && spoofPitch.get())
             .build()
     );
@@ -167,6 +168,7 @@ public class ElytraFlyPlusPlus extends Module {
             .name("yaw")
             .description("The yaw to set when bounce is enabled. This is auto set to the closest 45 deg angle to you unless Auto Yaw is disabled.")
             .defaultValue(0.0)
+            .sliderRange(0, 359)
             .visible(() -> !autoYaw.get() && autoYaw.isVisible())
             .build()
     );
