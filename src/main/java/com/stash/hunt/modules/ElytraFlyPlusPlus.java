@@ -68,6 +68,14 @@ public class ElytraFlyPlusPlus extends Module {
         .build()
     );
 
+    private final Setting<Boolean> onlyWhileColliding = sgGeneral.add(new BoolSetting.Builder()
+        .name("Only While Colliding")
+        .description("Only enables motion y boost if colliding with a wall.")
+        .defaultValue(true)
+        .visible(() -> bounce.get() && motionYBoost.get())
+        .build()
+    );
+
     private final Setting<Boolean> tunnelBounce = sgGeneral.add(new BoolSetting.Builder()
         .name("tunnel-bounce")
         .description("Allows you to bounce in 1x2 tunnels. This should not be on if you are not in a tunnel.")
@@ -157,7 +165,8 @@ public class ElytraFlyPlusPlus extends Module {
     private final Setting<Boolean> autoYaw = sgGeneral.add(
         new BoolSetting.Builder()
             .name("auto-yaw")
-            .description("Disable this if you want to use a custom yaw value.")
+            .description("Disable this if you want to use a custom yaw value.  WARNING: This effects the baritone goal for obstacle passer, \" +\n" +
+                "            \"use the default Rotations module if you only want a different yawlock.")
             .defaultValue(true)
             .visible(() -> bounce.get() && spoofYaw.get())
             .build()
@@ -166,7 +175,8 @@ public class ElytraFlyPlusPlus extends Module {
     private final Setting<Double> yaw = sgGeneral.add(
         new DoubleSetting.Builder()
             .name("yaw")
-            .description("The yaw to set when bounce is enabled. This is auto set to the closest 45 deg angle to you unless Auto Yaw is disabled.")
+            .description("The yaw to set when bounce is enabled. This is auto set to the closest 45 deg angle to you unless Auto Yaw is disabled." +
+                "WARNING: This effects the baritone goal for obstacle passer, use the default Rotations module if you only want a different yawlock.")
             .defaultValue(0.0)
             .sliderRange(0, 359)
             .visible(() -> !autoYaw.get() && autoYaw.isVisible())
@@ -373,6 +383,8 @@ public class ElytraFlyPlusPlus extends Module {
     {
         if (mc.player == null || event.type != MovementType.SELF || !enabled() || !motionYBoost.get() || !bounce.get()) return;
 
+        if (onlyWhileColliding.get() && !mc.player.horizontalCollision) return;
+
         if (lastPos != null)
         {
             double speedBps = mc.player.getPos().subtract(lastPos).multiply(20, 0, 20).length();
@@ -527,11 +539,12 @@ public class ElytraFlyPlusPlus extends Module {
             }
 
             if (highwayObstaclePasser.get() && mc.player.getPos().length() > 100 && // > 100 check needed bc server sends queue coordinates when joining in first tick causing goal coordinates to be set to (0, 0)
-                (mc.player.getY() < targetY.get() || mc.player.getY() > targetY.get() + 2 || mc.player.horizontalCollision // collisions / out of highway
+                (mc.player.getY() < targetY.get() || mc.player.getY() > targetY.get() + 2 || (mc.player.horizontalCollision && !mc.player.collidedSoftly) // collisions / out of highway
                 || (portalTrap != null && portalTrap.getSquaredDistance(mc.player.getBlockPos()) < portalAvoidDistance.get() * portalAvoidDistance.get()) // portal trap detection
                 || waitingForChunksToLoad // waiting for chunks to load
                 || stuckTimer > 50))
             {
+                if (shouldSpoofPitch()) mc.player.setPitch(camPitch);
                 waitingForChunksToLoad = false;
                 paused = true;
                 BlockPos goal = mc.player.getBlockPos();
@@ -691,6 +704,7 @@ public class ElytraFlyPlusPlus extends Module {
     @EventHandler
     private void onPlaySound(PlaySoundEvent event)
     {
+        if (!fakeFly.get()) return;
         List<Identifier> armorEquipSounds = List.of(
             Identifier.of("minecraft:item.armor.equip_generic"),
             Identifier.of("minecraft:item.armor.equip_netherite"),
