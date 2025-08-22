@@ -59,7 +59,7 @@ public class MouseMixin {
                 bounce.camYaw += (float) (k / 8.0);
                 if (bounce.shouldSpoofPitch())
                 {
-                    bounce.camPitch += (float) (l / 8.0);
+                    bounce.camPitch += (float) ((l * invert) / 8.0);
                     if (Math.abs(bounce.camPitch) > 90.0F) bounce.camPitch = bounce.camPitch > 0.0F ? 90.0F : -90.0F;
                 }
                 else
@@ -70,7 +70,7 @@ public class MouseMixin {
             }
             else if (bounce.shouldSpoofPitch())
             {
-                bounce.camPitch += (float) (l / 8.0);
+                bounce.camPitch += (float) ((l * invert) / 8.0);
                 if (Math.abs(bounce.camPitch) > 90.0F) bounce.camPitch = bounce.camPitch > 0.0F ? 90.0F : -90.0F;
 
                 // pass-through yaw
@@ -79,8 +79,6 @@ public class MouseMixin {
             else if (bounce.spoofYaw.get())
             {
                 bounce.camYaw += (float) (k / 8.0);
-                bounce.camPitch += (float) (l / 8.0);
-                if (Math.abs(bounce.camPitch) > 90.0F) bounce.camPitch = bounce.camPitch > 0.0F ? 90.0F : -90.0F;
 
                 // pass-through pitch
                 mc.player.changeLookDirection(0.0, l * invert);
